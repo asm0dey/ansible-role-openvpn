@@ -158,3 +158,4 @@
     special_time: weekly
     job: "sh {{ openvpn_base_dir }}/crl-cron.sh"
   when: not ci_build
+
