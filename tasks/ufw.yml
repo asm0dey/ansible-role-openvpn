@@ -1,3 +1,4 @@
+---
 - name: Start ufw service
   service:
     name: ufw
@@ -34,11 +35,17 @@
     dest: /etc/ufw/before.rules
     state: present
     insertbefore: \*filter
-    block: |
+    block: >
       # OpenVPN config
       *nat
+
       :POSTROUTING ACCEPT [0:0]
-      -A POSTROUTING -s {{ openvpn_server_network }}/24 -j SNAT --to-source {{ ansible_default_ipv4.address }}
+
+      -A POSTROUTING
+      -s {{ openvpn_server_network }}/24
+      -j SNAT
+      --to-source {{ ansible_default_ipv4.address }}
+
       COMMIT
   notify:
     - restart ufw

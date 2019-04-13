@@ -1,6 +1,9 @@
+---
 galaxy_info:
     author: 'Kyle Lexmond'
-    description: 'OpenVPN playbook for CentOS/Fedora/RHEL/RHEL clones & Ubuntu/Debian'
+    description: >-
+        OpenVPN playbook for CentOS/Fedora/RHEL/RHEL clones
+        & Ubuntu/Debian
     license: GPLv2
     min_ansible_version: 2.4
     platforms:
