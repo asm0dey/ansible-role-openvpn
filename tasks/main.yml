@@ -3,9 +3,7 @@
 - name: Include OS-specific variables
   include_vars: "{{ item }}"
   with_first_found:
-    - >-
-      ../vars/{{
-      ansible_distribution }}{{ ansible_distribution_major_version }}.yml
+    - "../vars/{{ ansible_distribution }}{{ ansible_distribution_major_version }}.yml"
     - "../vars/{{ ansible_distribution }}.yml"
     - "../vars/{{ ansible_os_family }}.yml"
     - "../vars/empty.yml"
@@ -36,16 +34,16 @@
 - name: enable ipv4 forwarding
   sysctl:
     name: net.ipv4.ip_forward
-    value: 1
-    ignoreerrors: true
+    value: '1'
+    ignoreerrors: yes
   failed_when: false
   when: not ci_build
 
 - name: enable ipv6 forwarding
   sysctl:
     name: net.ipv6.conf.all.forwarding
-    value: 1
-    ignoreerrors: true
+    value: '1'
+    ignoreerrors: yes
   when: openvpn_server_ipv6_network is defined and not ci_build
 
 - name: Detect firewall type

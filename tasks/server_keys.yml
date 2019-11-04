@@ -165,17 +165,15 @@
     mode: 0744
 
 - name: check if certificate revocation list database exists
-  file:
-    path: "{{ openvpn_key_dir }}/index.txt"
-    state: file
-  ignore_errors: true
+  stat:
+    path: "{{openvpn_key_dir}}/index.txt"
   register: file_result
 
 - name: create certificate revocation list database if required
   file:
     path: "{{ openvpn_key_dir }}/index.txt"
     state: touch
-  when: file_result.state == 'absent'
+  when: file_result.stat.exists == False
 
 - name: set up certificate revocation list
   command: sh revoke.sh

@@ -1,24 +1,24 @@
 ---
 - name: Check for firewalld
-  command: which firewall-cmd
+  shell: command -v firewall-cmd
   register: firewalld
   check_mode: false
   changed_when: false  # Never report as changed
-  ignore_errors: true
+  failed_when: false
 
 - name: Check for ufw
-  command: which ufw
+  shell: command -v ufw
   register: ufw
   check_mode: false
   changed_when: false  # Never report as changed
-  ignore_errors: true
+  failed_when: false
 
 - name: Check for iptables
-  command: which iptables
+  shell: command -v iptables
   register: iptables
   check_mode: false
   changed_when: false  # Never report as changed
-  ignore_errors: true
+  failed_when: false
 
 - name: Fail on both firewalld & ufw
   fail:
@@ -27,9 +27,7 @@
 
 - name: Fail on no firewall detected
   fail:
-    msg: >-
-      No firewall detected,
-      install one before proceeding (firewalld||ufw||iptables)
+    msg: "No firewall detected, install one before proceeding (firewalld||ufw||iptables)"
   when: firewalld.rc != 0 and ufw.rc != 0 and iptables.rc != 0
 
 - name: Add port rules (iptables)

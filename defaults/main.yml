@@ -38,7 +38,14 @@ openvpn_client_to_client: false
 openvpn_masquerade_not_snat: false
 openvpn_addl_server_options: []
 openvpn_addl_client_options: []
-openvpn_compression: lz4
+openvpn_compression: lzo
+openvpn_auth_alg: SHA256
+openvpn_cipher: AES-256-CBC
+openvpn_tun_mtu:
+openvpn_keepalive_ping: 5
+openvpn_keepalive_timeout: 30
+openvpn_service_user: nobody
+openvpn_service_group: nogroup
 
 # Used in firewalld
 firewalld_default_interface_zone: public
@@ -57,3 +64,15 @@ ldap:
   require_group: false
   group_base_dn: ou=Groups,dc=example,dc=com
   group_search_filter: (|(cn=developers)(cn=artists))
+
+# Logrotate configuration
+openvpn_log_dir: /var/log
+openvpn_log_file: openvpn.log
+openvpn_logrotate_config: |
+  rotate 4
+  weekly
+  missingok
+  notifempty
+  sharedscripts
+  copytruncate
+  delaycompress
