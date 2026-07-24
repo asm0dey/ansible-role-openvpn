@@ -73,6 +73,13 @@ class InstanceInfo:
     phase: Phase = Phase.QUEUED
     phase_detail: str = ""
     phase_started: float = field(default_factory=time.monotonic)
+    # Set once, when entering Phase.DONE - see phase_elapsed and set_phase. Nothing happens
+    # during DONE, so there's no "how long has this been going" to show; without this,
+    # phase_elapsed keeps ticking against phase_started for as long as the status board keeps
+    # refreshing, which is the whole scenario (verify_instance runs its per-instance loop in
+    # run_scenario sequentially, not in parallel) - an instance that finishes early would show
+    # a steadily growing Elapsed column that has nothing to do with how long it actually took.
+    phase_elapsed_frozen: float | None = None
 
     @property
     def is_reachable(self) -> bool:
@@ -122,10 +129,14 @@ class InstanceInfo:
         """Advances the lifecycle phase and resets the elapsed-time clock used by
         the status board. `detail` is free text - e.g. the current Ansible task
         name - shown alongside the phase so it's clear what's actually happening."""
+        if phase == Phase.DONE:
+            self.phase_elapsed_frozen = self.phase_elapsed
         self.phase = phase
         self.phase_detail = detail
         self.phase_started = time.monotonic()
 
     @property
     def phase_elapsed(self) -> float:
+        if self.phase_elapsed_frozen is not None:
+            return self.phase_elapsed_frozen
         return time.monotonic() - self.phase_started
