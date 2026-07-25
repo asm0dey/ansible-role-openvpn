@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 
 from .models import InstanceInfo, Phase, Status
+from .provisioning import safe_filename_component
 
 logger = logging.getLogger(__name__)
 
@@ -20,13 +21,13 @@ CURL_RETRY_DELAY = 3
 VERIFY_CLIENT_NAME = "client1"
 
 
-def wait_for_tunnel_up(log_path: Path, timeout: int = TUNNEL_UP_TIMEOUT) -> bool:
+def wait_for_tunnel_up(openvpn_log_path: Path, timeout: int = TUNNEL_UP_TIMEOUT) -> bool:
     """Polls the OpenVPN client log for the tunnel-established marker, instead of
     guessing with a fixed sleep."""
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         res = subprocess.run(
-            ["sudo", "grep", "-q", "Initialization Sequence Completed", str(log_path)],
+            ["sudo", "grep", "-q", "Initialization Sequence Completed", str(openvpn_log_path)],
             capture_output=True,
         )
         if res.returncode == 0:
@@ -35,13 +36,20 @@ def wait_for_tunnel_up(log_path: Path, timeout: int = TUNNEL_UP_TIMEOUT) -> bool
     return False
 
 
-def tail_log(log_path: Path, lines: int = 15) -> str:
+def tail_log(openvpn_log_path: Path, lines: int = 15) -> str:
     res = subprocess.run(
-        ["sudo", "tail", "-n", str(lines), str(log_path)],
+        ["sudo", "tail", "-n", str(lines), str(openvpn_log_path)],
         capture_output=True,
         text=True,
     )
     return " ".join(res.stdout.split())
+
+
+def openvpn_log_path(log_dir: Path, inst: InstanceInfo) -> Path:
+    """Matches provisioning.instance_log_path's naming, with an -openvpn suffix so the two
+    don't collide in the same directory - "log_path" alone means different files in the two
+    modules (the ansible-playbook log there, the OpenVPN client log here)."""
+    return log_dir / f"{safe_filename_component(inst.display_name)}-{inst.id}-openvpn.log"
 
 
 def curl_with_retry(url: str) -> subprocess.CompletedProcess[str]:
@@ -51,20 +59,19 @@ def curl_with_retry(url: str) -> subprocess.CompletedProcess[str]:
     curl failed with "Resolving timed out", then succeeded immediately on retry a few seconds
     later with no other change. Returns the last attempt either way, so its stdout/stderr are
     still available for a genuine (non-transient) failure."""
-    result = subprocess.run(
-        f"curl -sS --connect-timeout 10 {url}", shell=True, capture_output=True, text=True
-    )
-    for _ in range(CURL_RETRIES - 1):
-        if result.returncode == 0:
-            return result
-        time.sleep(CURL_RETRY_DELAY)
+    result: subprocess.CompletedProcess[str] | None = None
+    for attempt in range(CURL_RETRIES):
         result = subprocess.run(
             f"curl -sS --connect-timeout 10 {url}", shell=True, capture_output=True, text=True
         )
+        if result.returncode == 0 or attempt == CURL_RETRIES - 1:
+            return result
+        time.sleep(CURL_RETRY_DELAY)
+    assert result is not None  # CURL_RETRIES >= 1 guarantees the loop set this
     return result
 
 
-def verify_instance(instance: InstanceInfo, fetch_base_dir: Path) -> None:
+def verify_instance(instance: InstanceInfo, fetch_base_dir: Path, log_dir: Path) -> None:
     """Verifies the VPN connection for a single instance (IPv4 and IPv6) in one session."""
     if not instance.is_reachable:
         return
@@ -82,13 +89,13 @@ def verify_instance(instance: InstanceInfo, fetch_base_dir: Path) -> None:
     logger.info(f"Testing VPN connectivity for {instance.display_name}...")
 
     pid_file = Path(f"/tmp/openvpn_{instance.id}.pid")
-    log_path = Path(f"/tmp/openvpn_{instance.id}.log")
+    ovpn_log_path = openvpn_log_path(log_dir, instance)
 
     try:
         # 1. Start OpenVPN
         subprocess.run(
             f"sudo /usr/bin/openvpn --config {config_path} --daemon "
-            f"--writepid {pid_file} --log {log_path}",
+            f"--writepid {pid_file} --log {ovpn_log_path}",
             shell=True,
             check=True,
             capture_output=True,
@@ -96,8 +103,8 @@ def verify_instance(instance: InstanceInfo, fetch_base_dir: Path) -> None:
 
         # 2. Wait for the tunnel to actually come up instead of guessing with a fixed sleep
         instance.phase_detail = "waiting for tunnel"
-        if not wait_for_tunnel_up(log_path):
-            detail = tail_log(log_path)
+        if not wait_for_tunnel_up(ovpn_log_path):
+            detail = tail_log(ovpn_log_path)
             logger.error(f"Tunnel never came up for {instance.display_name}: {detail}")
             instance.status = Status.TUNNEL_FAILED
             instance.failure_detail = detail
@@ -182,7 +189,9 @@ def verify_instance(instance: InstanceInfo, fetch_base_dir: Path) -> None:
                 logger.warning(f"OpenVPN pid {pid} didn't exit after SIGTERM; forcing.")
                 subprocess.run(["sudo", "kill", "-9", pid], capture_output=True)
             subprocess.run(["sudo", "rm", "-f", str(pid_file)], capture_output=True)
-        subprocess.run(["sudo", "rm", "-f", str(log_path)], capture_output=True)
+        # The OpenVPN client log itself is durable output (see ADR-003's correction) and
+        # deliberately not deleted here - only the pid file, which is pure process bookkeeping,
+        # is ephemeral.
 
     # Overall Status update - PASS requires each address family that's actually present
     # (public_ip / public_ipv6) to have tested PASS; families the instance doesn't have are

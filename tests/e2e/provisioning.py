@@ -47,12 +47,12 @@ _RESULT_LINE = re.compile(r"^(ok|changed|skipping|failed|fatal):\s*\[")
 _UNSAFE_FILENAME_CHARS = re.compile(r"[^\w.-]+")
 
 
-def _safe_filename_component(text: str) -> str:
+def safe_filename_component(text: str) -> str:
     return _UNSAFE_FILENAME_CHARS.sub("_", text).strip("_") or "unknown"
 
 
 def instance_log_path(log_dir: Path, inst: InstanceInfo) -> Path:
-    return log_dir / f"{_safe_filename_component(inst.display_name)}-{inst.id}.log"
+    return log_dir / f"{safe_filename_component(inst.display_name)}-{inst.id}.log"
 
 
 def _timing_path(log_path: Path) -> Path:

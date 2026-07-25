@@ -15,8 +15,8 @@ logger = logging.getLogger(__name__)
 def get_instances(
     region: str,
     profile: str | None = None,
-    tag_key: str | None = None,
-    tag_value: str | None = None,
+    filter_tag_key: str | None = None,
+    filter_tag_value: str | None = None,
 ) -> list[InstanceInfo]:
     """Enumerates running EC2 instances."""
     logger.info(f"Enumerating instances in {region} (Profile: {profile or 'default'})...")
@@ -25,13 +25,17 @@ def get_instances(
     ec2 = session.resource("ec2")
     filters = [{"Name": "instance-state-name", "Values": ["running"]}]
 
-    if tag_key and tag_value:
-        filters.append({"Name": f"tag:{tag_key}", "Values": [tag_value]})
+    if filter_tag_key and filter_tag_value:
+        filters.append({"Name": f"tag:{filter_tag_key}", "Values": [filter_tag_value]})
 
     raw_instances = list(ec2.instances.filter(Filters=filters))
 
-    # Look up each instance's public dual-stack DNS name (resolves to both the
-    # public IPv4 and public IPv6 address) in one batched call.
+    # Look up each instance's public dual-stack DNS name (resolves to both the public IPv4 and
+    # public IPv6 address) in one batched call. This can't be read off the network interfaces
+    # already being iterated below: the InstanceNetworkInterface shape DescribeInstances embeds
+    # (what instance.network_interfaces returns) has no PublicIpDnsNameOptions field at all -
+    # only the standalone DescribeNetworkInterfaces call (ec2.network_interfaces.filter here)
+    # returns it, confirmed against botocore's ec2 service model.
     eni_ids = [ni.id for instance in raw_instances for ni in instance.network_interfaces]
     dual_stack_dns_by_eni: dict[str, str] = (
         {
@@ -49,12 +53,13 @@ def get_instances(
         architecture = "unknown"
         if instance.tags:
             for tag in instance.tags:
-                if tag["Key"] == "Name":
-                    name = tag["Value"]
-                elif tag["Key"] == "AddressFamily":
-                    address_family = tag["Value"]
-                elif tag["Key"] == "Architecture":
-                    architecture = tag["Value"]
+                match tag["Key"]:
+                    case "Name":
+                        name = tag["Value"]
+                    case "AddressFamily":
+                        address_family = tag["Value"]
+                    case "Architecture":
+                        architecture = tag["Value"]
 
         public_ipv6 = None
         dual_stack_dns = ""

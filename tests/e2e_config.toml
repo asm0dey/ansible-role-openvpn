@@ -3,8 +3,8 @@
 [aws]
 region = "us-east-2"
 profile = "sdk"
-# tag_key = "Environment"
-# Optional: tag_value = "Test"
+# filter_tag_key = "Environment"
+# Optional: filter_tag_value = "Test"
 
 [ssh]
 default_user = "ec2-user"

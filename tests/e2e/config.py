@@ -18,8 +18,8 @@ from typing import Any
 class AWSSettings:
     region: str
     profile: str | None
-    tag_key: str | None
-    tag_value: str | None
+    filter_tag_key: str | None
+    filter_tag_value: str | None
 
 
 @dataclass
@@ -96,8 +96,8 @@ def load_settings(argv: list[str] | None = None) -> RunSettings:
         aws=AWSSettings(
             region=args.region or aws_config.get("region", "us-east-1"),
             profile=args.profile or aws_config.get("profile"),
-            tag_key=aws_config.get("tag_key"),
-            tag_value=aws_config.get("tag_value"),
+            filter_tag_key=aws_config.get("filter_tag_key"),
+            filter_tag_value=aws_config.get("filter_tag_value"),
         ),
         ssh=SSHSettings(
             key_path=Path(ssh_key_str) if ssh_key_str else None,

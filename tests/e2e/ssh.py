@@ -83,9 +83,8 @@ def wait_for_ssh_ready(
 ) -> bool:
     """Retries the actual SSH connection until it succeeds or timeout elapses, rather than a
     single shot-in-the-dark attempt or a proxy signal like EC2 status checks (those only verify
-    ARP-level reachability to the kernel and can report healthy well before sshd exists - e.g.
-    an IPv6-only instance's cloud-init-local stage can burn several minutes retrying IMDS before
-    the network, and therefore sshd, ever comes up)."""
+    ARP-level reachability to the kernel and can report healthy well before sshd itself has
+    actually started)."""
     user = determine_ssh_user(instance.name, default_user)
     instance.set_phase(Phase.WAITING_SSH, f"attempt 1 as {user}")
     logger.info(f"Waiting for SSH on {instance_label(instance)} ({instance.hostname}) as {user}...")

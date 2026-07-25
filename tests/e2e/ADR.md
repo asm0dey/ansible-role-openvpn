@@ -83,6 +83,14 @@ to know to look under `/tmp/ansible-openvpn-e2e/`. The final report path is
 logged at the end of every run specifically so this isn't a problem in
 practice.
 
+**Correction (PR #279 review):** the OpenVPN client log was reconsidered - it's diagnostic output
+same as everything else here, and there was no good reason to delete it while keeping the
+ansible-playbook log and timing file. `verification.openvpn_log_path` now writes it into the same
+per-scenario directory as `instance_log_path`'s ansible log (`<name>-<id>-openvpn.log`, distinct
+suffix so the two don't collide), and it's no longer deleted in `verify_instance`'s `finally`
+block. Only the pid file (`/tmp/openvpn_<id>.pid`, pure process bookkeeping - not diagnostic
+output) is still ephemeral and cleaned up after use.
+
 ## ADR-004: Human-facing display name, not the AWS DNS name
 
 **Status:** Accepted

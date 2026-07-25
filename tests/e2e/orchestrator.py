@@ -43,9 +43,10 @@ def _wait_and_provision(inst: InstanceInfo, settings: RunSettings, log_dir: Path
     """Waits for this instance's own SSH readiness, then its own cloud-init completion, then
     immediately provisions it - instances don't wait on each other. Each instance's
     ansible-playbook run is already an independent subprocess (see provisioning.py), so there's
-    no reason a slow-booting sibling (e.g. an IPv6-only instance's cloud-init taking minutes
-    longer) should hold up everyone else from starting; the old two-stage "wait for all, then
-    provision all" batching did exactly that.
+    no reason a slow-booting sibling (e.g. a RHEL10-family instance's cloud-init taking several
+    minutes longer to install firewalld - see CLOUD_INIT_TIMEOUT in ssh.py) should hold up
+    everyone else from starting; the old two-stage "wait for all, then provision all" batching
+    did exactly that.
 
     The cloud-init wait matters on its own, not just for pacing: SSH accepting connections
     doesn't mean cloud-init's own package installs are done (see wait_for_cloud_init) - skipping
@@ -70,7 +71,10 @@ def run_scenario(
     Terraform apply/destroy happen outside this - see e2e.terraform, which logs its own
     summary line and writes full plan/apply output to a file rather than the console."""
     instances = get_instances(
-        settings.aws.region, settings.aws.profile, settings.aws.tag_key, settings.aws.tag_value
+        settings.aws.region,
+        settings.aws.profile,
+        settings.aws.filter_tag_key,
+        settings.aws.filter_tag_value,
     )
     if not instances:
         logger.error(f"No instances found for scenario {scenario}.")
@@ -98,7 +102,7 @@ def run_scenario(
             )
 
         for inst in instances:
-            verify_instance(inst, FETCH_DIR)
+            verify_instance(inst, FETCH_DIR, scenario_log_dir)
             inst.set_phase(Phase.DONE, str(inst.status))
 
     return instances
